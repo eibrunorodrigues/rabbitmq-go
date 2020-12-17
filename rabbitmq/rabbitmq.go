@@ -77,6 +77,8 @@ func (r *RabbitMQ) Connect() *amqp.Channel {
 		}
 		r.localConnection = &conn
 	} else if r.channel == nil || r.channel.IsClosed() {
+		//this implementation depends on approval of pull request:
+		//https://github.com/streadway/amqp/pull/486
 		ch, err := r.localConnection.Channel()
 
 		if err != nil {
