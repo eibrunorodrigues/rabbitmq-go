@@ -17,10 +17,11 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// RabbitMQ layer following brokers-go/interfaces/broker.go interface
-type RabbitMQ struct {
+// Client layer following brokers-go/interfaces/broker.go interface
+type Client struct {
 	localConnection *amqp.Connection
 	channel         *amqp.Channel
+	channelIsOpen   bool
 	isListening     bool
 	consumerTag     string
 	Config          Configs
@@ -39,7 +40,7 @@ type Configs struct {
 	Prefetch      int
 }
 
-func (r *RabbitMQ) connect() (amqp.Connection, error) {
+func (r *Client) connect() (amqp.Connection, error) {
 	if r.Config.Host == "" {
 		r.Config = Configs{
 			Host:          utils.GetTypedEnvVariable("BROKER_HOST", "localhost", reflect.String).(string),
@@ -68,23 +69,22 @@ func (r *RabbitMQ) connect() (amqp.Connection, error) {
 	return amqp.Connection{}, err
 }
 
-// Connect connects or reconnects to RabbitMQ
-func (r *RabbitMQ) Connect() *amqp.Channel {
+// Connect connects or reconnects to Client
+func (r *Client) Connect() *amqp.Channel {
 	if r.localConnection == nil || r.localConnection.IsClosed() {
 		conn, err := r.connect()
 		if err != nil {
 			panic(err.Error())
 		}
 		r.localConnection = &conn
-	} else if r.channel == nil || r.channel.IsClosed() {
-		//this implementation depends on approval of pull request:
+	} else if r.channel == nil {
+		//better implementation for this depends on approval of pull request:
 		//https://github.com/streadway/amqp/pull/486
 		ch, err := r.localConnection.Channel()
 
 		if err != nil {
 			panic(err)
 		}
-
 		r.channel = ch
 	}
 
@@ -92,25 +92,25 @@ func (r *RabbitMQ) Connect() *amqp.Channel {
 }
 
 // IsOpen verifys if the connection and channel are open
-func (r *RabbitMQ) IsOpen() bool {
-	return !r.localConnection.IsClosed() && !r.channel.IsClosed()
+func (r *Client) IsOpen() bool {
+	return !r.localConnection.IsClosed() && r.channelIsOpen
 }
 
 //AcknowledgeMessage lets Rabbit knows that you received successfully a message
 //and removes it from a queue
-func (r *RabbitMQ) AcknowledgeMessage(messageID int) {
+func (r *Client) AcknowledgeMessage(messageID int) {
 	_ = r.Connect().Ack(uint64(messageID), false)
 }
 
 //RejectMessage lets Rabbit knows that you received successfully a message
 //and removes it from a queue
-func (r *RabbitMQ) RejectMessage(messageID int, requeue bool) {
+func (r *Client) RejectMessage(messageID int, requeue bool) {
 	_ = r.Connect().Reject(uint64(messageID), requeue)
 }
 
 //CheckIfQueueExists Passive Declares a Queue. If an error with "not_found"
 //is thrown, then the queue doesnt exist.
-func (r *RabbitMQ) CheckIfQueueExists(queueName string) bool {
+func (r *Client) CheckIfQueueExists(queueName string) bool {
 	_, err := r.Connect().QueueDeclarePassive(queueName, true, false, false, false, amqp.Table{})
 	if err != nil && strings.Contains(err.Error(), "not_found") {
 		return false
@@ -120,7 +120,7 @@ func (r *RabbitMQ) CheckIfQueueExists(queueName string) bool {
 
 //CheckIfRouterExists Passive Declares a Router. If an error with "not_found"
 //is thrown, then the router doesnt exist.
-func (r *RabbitMQ) CheckIfRouterExists(routerName string) bool {
+func (r *Client) CheckIfRouterExists(routerName string) bool {
 	exchangeType, _ := enums.RouterType.TOPIC.String()
 	err := r.Connect().ExchangeDeclarePassive(routerName, strings.ToLower(exchangeType), true, false, false, false, amqp.Table{})
 	if err != nil && strings.Contains(err.Error(), "not_found") {
@@ -130,7 +130,7 @@ func (r *RabbitMQ) CheckIfRouterExists(routerName string) bool {
 }
 
 //CreateQueue creates a fancy queue (with dlq, exchanges and binds) and returns the name
-func (r *RabbitMQ) CreateQueue(queueName string, createDlq bool, exclusive bool) (string, error) {
+func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (string, error) {
 	validateQueueName(queueName)
 	queueName = strings.ToUpper(queueName)
 
@@ -177,7 +177,7 @@ func (r *RabbitMQ) CreateQueue(queueName string, createDlq bool, exclusive bool)
 }
 
 //CreateRouter creates an Exchange and returns the formatted name
-func (r *RabbitMQ) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, routerType enums.RouterTypeEnum) string {
+func (r *Client) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, routerType enums.RouterTypeEnum) string {
 	routerName = validateRouterName(routerName, prefix)
 
 	routerTypeString, err := routerType.String()
@@ -197,7 +197,7 @@ func (r *RabbitMQ) CreateRouter(routerName string, prefix enums.RouterPrefixEnum
 }
 
 //PublishToQueue Publishes a message to a queue and return if it published successfully.
-func (r *RabbitMQ) PublishToQueue(message []byte, queueName string, filters []types.Filters) (bool, error) {
+func (r *Client) PublishToQueue(message []byte, queueName string, filters []types.Filters) (bool, error) {
 	if _, err := validateFiltersArg(filters); err != nil {
 		return false, err
 	}
@@ -207,7 +207,7 @@ func (r *RabbitMQ) PublishToQueue(message []byte, queueName string, filters []ty
 
 //PublishToRouter Publishes a message to a router and return if it published
 //successfully.
-func (r *RabbitMQ) PublishToRouter(message []byte, routerName string, filters interface{}) (bool, error) {
+func (r *Client) PublishToRouter(message []byte, routerName string, filters interface{}) (bool, error) {
 	if _, err := validateFiltersArg(filters); err != nil {
 		return false, err
 	}
@@ -217,7 +217,7 @@ func (r *RabbitMQ) PublishToRouter(message []byte, routerName string, filters in
 
 //DeleteQueue deletes an existing queue and return if it the operation was
 //successfully completed.
-func (r *RabbitMQ) DeleteQueue(queueName string) (bool, error) {
+func (r *Client) DeleteQueue(queueName string) (bool, error) {
 	_, err := r.Connect().QueueDelete(queueName, false, false, false)
 
 	if err != nil {
@@ -229,7 +229,7 @@ func (r *RabbitMQ) DeleteQueue(queueName string) (bool, error) {
 
 //DeleteRouter deletes an existing router and return if it the operation was
 //successfully completed.
-func (r *RabbitMQ) DeleteRouter(routerName string) (bool, error) {
+func (r *Client) DeleteRouter(routerName string) (bool, error) {
 	err := r.Connect().ExchangeDelete(routerName, false, false)
 
 	if err != nil {
@@ -240,17 +240,17 @@ func (r *RabbitMQ) DeleteRouter(routerName string) (bool, error) {
 }
 
 //Close method closes connection and channel.
-func (r *RabbitMQ) Close() {
+func (r *Client) Close() {
 	_ = r.localConnection.Close()
 }
 
 //HealthCheck method checks the current channel and connection status.
-func (r *RabbitMQ) HealthCheck() bool {
+func (r *Client) HealthCheck() bool {
 	return !r.localConnection.IsClosed()
 }
 
 //BindQueueToRouter binds a queue to an exchange.
-func (r *RabbitMQ) BindQueueToRouter(queueName string, routerName string, filters interface{}) (bool, error) {
+func (r *Client) BindQueueToRouter(queueName string, routerName string, filters interface{}) (bool, error) {
 	var err error = nil
 	switch filters.(type) {
 	case string:
@@ -264,7 +264,7 @@ func (r *RabbitMQ) BindQueueToRouter(queueName string, routerName string, filter
 }
 
 //BindRouterToRouter binds a router to an exchange.
-func (r *RabbitMQ) BindRouterToRouter(destination string, source string, filters interface{}) (bool, error) {
+func (r *Client) BindRouterToRouter(destination string, source string, filters interface{}) (bool, error) {
 	var err error = nil
 	switch filters.(type) {
 	case string:
@@ -279,7 +279,7 @@ func (r *RabbitMQ) BindRouterToRouter(destination string, source string, filters
 
 //Listen starts consuming a queue and calls a callback function to wait for
 //success on internal operation
-func (r *RabbitMQ) Listen(queueName string, receiverCallback types.ReceiverCallback) error {
+func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallback) error {
 	messages, err := r.Connect().Consume(queueName, queueName, false, false, false, false, nil)
 	if err != nil {
 		return err
@@ -313,7 +313,7 @@ func (r *RabbitMQ) Listen(queueName string, receiverCallback types.ReceiverCallb
 }
 
 //StopListening stops consuming a queue
-func (r *RabbitMQ) StopListening() (bool, error) {
+func (r *Client) StopListening() (bool, error) {
 	if err := r.Connect().Cancel(r.consumerTag, true); err != nil {
 		return false, err
 	}
@@ -390,7 +390,7 @@ func filtersToTable(filters []types.Filters) amqp.Table {
 	return table
 }
 
-func (r *RabbitMQ) publishMessage(message []byte, exchange string, routingKey string, filters interface{}, retries int) (bool, error) {
+func (r *Client) publishMessage(message []byte, exchange string, routingKey string, filters interface{}, retries int) (bool, error) {
 	publishingMsg := amqp.Publishing{Body: message, DeliveryMode: 2, Timestamp: time.Now()}
 
 	switch filters.(type) {
@@ -404,7 +404,7 @@ func (r *RabbitMQ) publishMessage(message []byte, exchange string, routingKey st
 		return false, errors.New("invalid filters type")
 	}
 
-	err := r.Connect().Publish(exchange, routingKey, true, true, publishingMsg)
+	err := r.Connect().Publish(exchange, routingKey, false, false, publishingMsg)
 	if err != nil {
 		if retries <= r.Config.SendRetryMax {
 			return r.publishMessage(message, exchange, routingKey, filters, retries+1)
