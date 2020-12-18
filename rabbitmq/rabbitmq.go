@@ -149,7 +149,7 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 		_, err := r.Connect().QueueDeclare(dlqQueue, true, false, false, false, filtersToTable(dlqArgs))
 
 		if err != nil {
-			panic(err.Error())
+			return "", err
 		}
 
 		if _, err := r.BindQueueToRouter(dlqQueue, routerName, "delay"); err != nil {
@@ -164,7 +164,7 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 
 	if err != nil {
 		if _, err := r.Connect().QueueDeclare(queueName, false, false, exclusive, false, amqp.Table{}); err != nil {
-			panic(err)
+			return "", err
 		}
 		log.Println("Wrong durable... Creating Queue with flag durable: false")
 	}
@@ -177,23 +177,23 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 }
 
 //CreateRouter creates an Exchange and returns the formatted name
-func (r *Client) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, routerType enums.RouterTypeEnum) string {
+func (r *Client) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, routerType enums.RouterTypeEnum) (string, error) {
 	routerName = validateRouterName(routerName, prefix)
 
 	routerTypeString, err := routerType.String()
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	err = r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), true, false, false, false, amqp.Table{})
 	if err != nil {
 		log.Println("Exchange with wrong durable")
 		if err := r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), false, false, false, false, amqp.Table{}); err != nil {
-			panic(err)
+			return "", err
 		}
 	}
 
-	return routerName
+	return routerName, nil
 }
 
 //PublishToQueue Publishes a message to a queue and return if it published successfully.

@@ -13,7 +13,7 @@ type IBroker interface {
 	CheckIfQueueExists(queueName string) bool
 	CheckIfRouterExists(routerName string) bool
 	CreateQueue(queueName string, createDlq bool, exclusive bool) (string, error)
-	CreateRouter(routerName string, prefix enums.RouterPrefixEnum, routerType enums.RouterTypeEnum) string
+	CreateRouter(routerName string, prefix enums.RouterPrefixEnum, routerType enums.RouterTypeEnum) (string, error)
 	PublishToQueue(message []byte, queueName string, filters []types.Filters) (bool, error)
 	PublishToRouter(message []byte, routerName string, filters interface{}) (bool, error)
 	DeleteQueue(queueName string) (bool, error)
