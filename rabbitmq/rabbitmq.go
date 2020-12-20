@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"reflect"
 	"regexp"
@@ -86,6 +87,7 @@ func (r *Client) Connect() *amqp.Channel {
 		r.channel.NotifyClose(errors)
 
 		go func(rr *Client, err chan *amqp.Error) {
+			fmt.Printf("Channel is Down... Reestablishing")
 			rr.channel = rr.makeChannel()
 		}(r, errors)
 	}
