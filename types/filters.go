@@ -1,6 +1,6 @@
 package types
 
 type Filters struct {
-	Key string
+	Key   string
 	Value interface{}
 }
