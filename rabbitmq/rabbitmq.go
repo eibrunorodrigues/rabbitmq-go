@@ -80,12 +80,14 @@ func (r *Client) Connect() *amqp.Channel {
 	} else if r.channel == nil {
 		//better implementation for this depends on approval of pull request:
 		//https://github.com/streadway/amqp/pull/486
-		ch, err := r.localConnection.Channel()
+		r.channel = r.makeChannel()
 
-		if err != nil {
-			panic(err)
-		}
-		r.channel = ch
+		errors := make(chan *amqp.Error)
+		r.channel.NotifyClose(errors)
+
+		go func(rr *Client, err chan *amqp.Error) {
+			rr.channel = rr.makeChannel()
+		}(r, errors)
 	}
 
 	return r.channel
@@ -412,4 +414,14 @@ func (r *Client) publishMessage(message []byte, exchange string, routingKey stri
 		return false, err
 	}
 	return true, nil
+}
+
+func (r *Client) makeChannel() *amqp.Channel {
+	ch, err := r.localConnection.Channel()
+
+	if err != nil {
+		panic(err)
+	}
+
+	return ch
 }
