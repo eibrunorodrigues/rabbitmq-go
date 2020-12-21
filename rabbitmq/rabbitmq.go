@@ -18,7 +18,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-// Client layer following brokers-go/interfaces/broker.go interface
+// Client layer following github.com/eibrunorodrigues/rabbitmq-go/interfaces/broker.go interface
 type Client struct {
 	localConnection *amqp.Connection
 	channel         *amqp.Channel
@@ -138,7 +138,12 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 	validateQueueName(queueName)
 	queueName = strings.ToUpper(queueName)
 
-	routerName := r.CreateRouter(queueName, enums.RouterPrefix.QUEUE, enums.RouterType.DIRECT)
+	routerName, err := r.CreateRouter(queueName, enums.RouterPrefix.QUEUE, enums.RouterType.DIRECT)
+
+	if err != nil {
+		return "", err
+	}
+
 	var queueArgs []types.Filters
 	dlqQueue := queueName + ".delay"
 
@@ -164,7 +169,7 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 		queueArgs = append(queueArgs, types.Filters{Key: "x-dead-letter-routing-key", Value: "delay"})
 	}
 
-	_, err := r.Connect().QueueDeclare(queueName, true, false, exclusive, false, amqp.Table{})
+	_, err = r.Connect().QueueDeclare(queueName, true, false, exclusive, false, amqp.Table{})
 
 	if err != nil {
 		if _, err := r.Connect().QueueDeclare(queueName, false, false, exclusive, false, amqp.Table{}); err != nil {
