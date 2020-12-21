@@ -299,17 +299,7 @@ func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallbac
 	for message := range messages {
 		r.consumerTag = message.ConsumerTag
 
-		receiverModel := types.Receiver{}
-		receiverModel.Filters = append(receiverModel.Filters, types.Filters{Key: "routing-key", Value: message.RoutingKey})
-
-		if message.Headers["x-first-death-exchange"] != nil {
-			receiverModel.RouterOrigin = message.Headers["x-first-death-exchange"].(string)
-		} else if message.Exchange != "" {
-			receiverModel.RouterOrigin = message.Exchange
-		}
-
-		receiverModel.IsARedelivery = checkIfIsARedelivery(message)
-		receiverModel.Body = message.Body
+		receiverModel := GetReceiverModel(message)
 
 		if _, err := receiverCallback(receiverModel); err != nil {
 			r.RejectMessage(int(message.DeliveryTag), !receiverModel.IsARedelivery)
@@ -319,6 +309,24 @@ func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallbac
 
 	}
 	return nil
+}
+
+//GetReceiverModel
+func GetReceiverModel(message amqp.Delivery) types.Receiver {
+	receiverModel := types.Receiver{}
+
+	receiverModel.Filters = append(receiverModel.Filters, types.Filters{Key: "routing-key", Value: message.RoutingKey})
+
+	if message.Headers["x-first-death-exchange"] != nil {
+		receiverModel.RouterOrigin = message.Headers["x-first-death-exchange"].(string)
+	} else if message.Exchange != "" {
+		receiverModel.RouterOrigin = message.Exchange
+	}
+
+	receiverModel.IsARedelivery = checkIfIsARedelivery(message)
+	receiverModel.Body = message.Body
+
+	return receiverModel
 }
 
 //StopListening stops consuming a queue
