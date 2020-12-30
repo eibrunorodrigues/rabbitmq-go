@@ -81,8 +81,9 @@ func (r *Client) Connect() *amqp.Channel {
 		return &amqp.Channel{}
 	}
 
-	if !r.instantiated {
+	if r.instantiated {
 		go r.reconnect()
+	} else {
 		r.instantiated = true
 	}
 
