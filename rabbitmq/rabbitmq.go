@@ -78,7 +78,9 @@ func (r *Client) Connect() *amqp.Channel {
 			panic(err.Error())
 		}
 		r.localConnection = &conn
-	} else if r.channel == nil {
+	}
+
+	if r.channel == nil {
 		//better implementation for this depends on approval of pull request:
 		//https://github.com/streadway/amqp/pull/486
 		r.channel = r.makeChannel()
