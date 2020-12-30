@@ -22,6 +22,7 @@ import (
 type Client struct {
 	localConnection  *amqp.Connection
 	channel          *amqp.Channel
+	forcedToClose    bool
 	instantiated     bool
 	reconnectAttemps int
 	channelIsOpen    bool
@@ -81,6 +82,10 @@ func (r *Client) Connect() *amqp.Channel {
 		r.instantiated = true
 	}
 
+	if r.forcedToClose {
+		return &amqp.Channel{}
+	}
+
 	if r.localConnection == nil || r.localConnection.IsClosed() {
 		conn, err := r.connect()
 		if err != nil {
@@ -112,6 +117,10 @@ func (r *Client) reconnect() {
 	graceful := make(chan *amqp.Error)
 	errs := r.channel.NotifyClose(graceful)
 	for {
+		if r.forcedToClose {
+			break
+		}
+
 		select {
 		case <-graceful:
 			graceful = make(chan *amqp.Error)
@@ -285,6 +294,7 @@ func (r *Client) DeleteRouter(routerName string) (bool, error) {
 //Close method closes connection and channel.
 func (r *Client) Close() {
 	if !r.localConnection.IsClosed() {
+		r.forcedToClose = true
 		_ = r.localConnection.Close()
 	}
 }
