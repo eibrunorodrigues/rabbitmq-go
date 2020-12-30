@@ -80,6 +80,7 @@ func (r *Client) Connect() *amqp.Channel {
 		if err != nil {
 			if r.reconnectAttemps <= r.Config.ReconnectAttemps {
 				r.reconnectAttemps += 1
+				r.localConnection = nil
 				return r.Connect()
 			} else {
 				panic(err.Error())
