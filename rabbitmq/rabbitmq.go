@@ -63,7 +63,7 @@ func (r *Client) connect() (*amqp.Connection, error) {
 	}
 
 	if r.Config.Host == "" {
-		log.Fatalf("broker: please provide a truly valid BROKER_URI in your env")
+		log.Fatalf("rabbitmq: please provide a truly valid BROKER_URI in your env")
 	}
 
 	portString := strconv.Itoa(r.Config.Port)
@@ -88,7 +88,7 @@ func (r *Client) Connect() *amqp.Channel {
 			if r.reconnectAttemps < r.Config.ReconnectAttemps {
 				r.reconnectAttemps += 1
 				r.localConnection = nil
-				fmt.Printf("\nbroker: connection attempt failed... retry %d/%d: %v", r.reconnectAttemps, r.Config.ReconnectAttemps, err)
+				fmt.Printf("\nrabbitmq: connection attempt failed... retry %d/%d: %v", r.reconnectAttemps, r.Config.ReconnectAttemps, err)
 				time.Sleep(2 * time.Second)
 				return r.Connect()
 			} else {
@@ -127,14 +127,14 @@ func (r *Client) reconnect() {
 		case <-graceful:
 			graceful = make(chan *amqp.Error)
 			r.channelIsOpen = false
-			fmt.Printf("broker: graceful closed, reconnecting")
+			fmt.Printf("rabbitmq: graceful closed, reconnecting")
 			r.Connect()
 			errs = r.channel.NotifyClose(graceful)
 		case <-errs:
 			graceful = make(chan *amqp.Error)
 			r.channelIsOpen = false
 			r.Connect()
-			fmt.Printf("broker: broker is down... reconnecting")
+			fmt.Printf("rabbitmq: broker is down... reconnecting")
 			errs = r.channel.NotifyClose(graceful)
 		}
 	}
@@ -220,7 +220,7 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 		if _, err := r.Connect().QueueDeclare(queueName, false, false, exclusive, false, amqp.Table{}); err != nil {
 			return "", err
 		}
-		fmt.Printf("\nbroker: wrong durable... Creating Queue with flag durable: false")
+		fmt.Printf("\nrabbitmq: wrong durable... Creating Queue with flag durable: false")
 	}
 	if !exclusive {
 		if _, err := r.BindQueueToRouter(queueName, routerName, ""); err != nil {
@@ -241,7 +241,7 @@ func (r *Client) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, 
 
 	err = r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), true, false, false, false, amqp.Table{})
 	if err != nil {
-		fmt.Printf("\nbroker: exchange with wrong durable")
+		fmt.Printf("\nrabbitmq: exchange with wrong durable")
 		if err := r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), false, false, false, false, amqp.Table{}); err != nil {
 			return "", err
 		}
@@ -315,7 +315,7 @@ func (r *Client) BindQueueToRouter(queueName string, routerName string, filters 
 	case []types.Filters:
 		err = r.Connect().QueueBind(queueName, "#", routerName, false, filtersToTable(filters.([]types.Filters)))
 	default:
-		return false, errors.New("broker: invalid filters type argument")
+		return false, errors.New("rabbitmq: invalid filters type argument")
 	}
 	return true, err
 }
@@ -329,7 +329,7 @@ func (r *Client) BindRouterToRouter(destination string, source string, filters i
 	case []types.Filters:
 		err = r.Connect().ExchangeBind(destination, "#", source, false, filtersToTable(filters.([]types.Filters)))
 	default:
-		return false, errors.New("broker: invalid filters type argument")
+		return false, errors.New("rabbitmq: invalid filters type argument")
 	}
 	return true, err
 }
@@ -407,13 +407,13 @@ func validateQueueName(queueName string) {
 	_, err = utils.StrToInt(queueName)
 
 	if queueName == "" || !isMatch || err == nil {
-		panic("broker: invalid QueueName " + queueName)
+		panic("rabbitmq: invalid QueueName " + queueName)
 	}
 }
 
 func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) string {
 	if routerName == "" {
-		panic("broker: empty routerName found")
+		panic("rabbitmq: empty routerName found")
 	}
 
 	isAFullRouterName, err := regexp.MatchString("^[A-Z]+\\/[a-zA-Z_0-9]+\\.master$", routerName)
@@ -426,7 +426,7 @@ func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) string
 		if _, err = enums.ParseRouterPrefix(strings.ToUpper(strPrefix)); err == nil {
 			return routerName
 		}
-		panic("broker: default prefix is not allowed. " + strPrefix)
+		panic("rabbitmq: default prefix is not allowed. " + strPrefix)
 	}
 
 	if _, err = regexp.MatchString("^[a-zA-Z_0-9]+$\"", routerName); err == nil {
@@ -434,7 +434,7 @@ func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) string
 		return strings.ToUpper(prefixString) + "/" + routerName + ".master"
 	}
 
-	panic("broker: invalid routerName found")
+	panic("rabbitmq: invalid routerName found")
 }
 
 func validateFiltersArg(filters interface{}) (bool, error) {
@@ -444,7 +444,7 @@ func validateFiltersArg(filters interface{}) (bool, error) {
 	case []types.Filters:
 		return true, nil
 	default:
-		return false, errors.New("broker: invalid filter passed")
+		return false, errors.New("rabbitmq: invalid filter passed")
 	}
 }
 
@@ -467,7 +467,7 @@ func (r *Client) publishMessage(message []byte, exchange string, routingKey stri
 		publishingMsg.Headers = filtersToTable(filters.([]types.Filters))
 		break
 	default:
-		return false, errors.New("broker: invalid filters type")
+		return false, errors.New("rabbitmq: invalid filters type")
 	}
 
 	err := r.Connect().Publish(exchange, routingKey, false, false, publishingMsg)
