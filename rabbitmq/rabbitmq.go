@@ -22,6 +22,7 @@ import (
 type Client struct {
 	localConnection  *amqp.Connection
 	channel          *amqp.Channel
+	instantiated     bool
 	reconnectAttemps int
 	channelIsOpen    bool
 	isListening      bool
@@ -75,6 +76,11 @@ func (r *Client) connect() (amqp.Connection, error) {
 
 // Connect connects or reconnects to Client
 func (r *Client) Connect() *amqp.Channel {
+	if !r.instantiated {
+		go r.reconnect()
+		r.instantiated = true
+	}
+
 	if r.localConnection == nil || r.localConnection.IsClosed() {
 		conn, err := r.connect()
 		if err != nil {
@@ -95,7 +101,6 @@ func (r *Client) Connect() *amqp.Channel {
 		//https://github.com/streadway/amqp/pull/486
 		r.channel = r.makeChannel()
 		r.channelIsOpen = true
-		go r.reconnect()
 	}
 
 	return r.channel
