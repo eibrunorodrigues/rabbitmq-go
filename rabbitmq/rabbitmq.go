@@ -95,15 +95,33 @@ func (r *Client) Connect() *amqp.Channel {
 		//https://github.com/streadway/amqp/pull/486
 		r.channel = r.makeChannel()
 		r.channelIsOpen = true
-		errors := make(chan *amqp.Error)
-		r.channel.NotifyClose(errors)
-
-		go func(err chan *amqp.Error) {
-			r.channelIsOpen = false
-		}(errors)
+		go r.reconnect()
 	}
 
 	return r.channel
+}
+
+// reconnect waits to be notified about a connection
+// error, and then attempts to reconnect to Client.
+func (r *Client) reconnect() {
+	graceful := make(chan *amqp.Error)
+	errs := r.channel.NotifyClose(graceful)
+	for {
+		select {
+		case <-graceful:
+			graceful = make(chan *amqp.Error)
+			r.channelIsOpen = false
+			fmt.Printf("broker: graceful closed, reconnecting")
+			r.Connect()
+			errs = r.channel.NotifyClose(graceful)
+		case <-errs:
+			graceful = make(chan *amqp.Error)
+			r.channelIsOpen = false
+			r.Connect()
+			fmt.Printf("broker: broker is down... reconnecting")
+			errs = r.channel.NotifyClose(graceful)
+		}
+	}
 }
 
 // IsOpen verifys if the connection and channel are open
