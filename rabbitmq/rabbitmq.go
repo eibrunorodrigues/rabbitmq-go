@@ -94,7 +94,7 @@ func (r *Client) Connect() *amqp.Channel {
 		//better implementation for this depends on approval of pull request:
 		//https://github.com/streadway/amqp/pull/486
 		r.channel = r.makeChannel()
-		r.channelIsOpen = !r.channelIsOpen
+		r.channelIsOpen = true
 		errors := make(chan *amqp.Error)
 		r.channel.NotifyClose(errors)
 
