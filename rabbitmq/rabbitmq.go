@@ -45,7 +45,7 @@ type Configs struct {
 	ReconnectAttemps int
 }
 
-func (r *Client) connect() (amqp.Connection, error) {
+func (r *Client) connect() (*amqp.Connection, error) {
 	if r.Config.Host == "" {
 		r.Config = Configs{
 			Host:             utils.GetTypedEnvVariable("BROKER_HOST", "localhost", reflect.String).(string),
@@ -69,10 +69,10 @@ func (r *Client) connect() (amqp.Connection, error) {
 
 	conn, err := amqp.Dial("amqp://" + r.Config.User + ":" + r.Config.Pass + "@" + r.Config.Host + ":" + portString + "/" + r.Config.Vhost)
 	if conn != nil {
-		return *conn, err
+		return conn, err
 	}
 
-	return amqp.Connection{}, err
+	return &amqp.Connection{}, err
 }
 
 // Connect connects or reconnects to Client
@@ -93,7 +93,7 @@ func (r *Client) Connect() *amqp.Channel {
 				panic(err.Error())
 			}
 		}
-		r.localConnection = &conn
+		r.localConnection = conn
 	}
 
 	if r.channel == nil || !r.channelIsOpen {
