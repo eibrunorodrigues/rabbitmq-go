@@ -77,13 +77,13 @@ func (r *Client) connect() (amqp.Connection, error) {
 
 // Connect connects or reconnects to Client
 func (r *Client) Connect() *amqp.Channel {
+	if r.forcedToClose {
+		return &amqp.Channel{}
+	}
+
 	if !r.instantiated {
 		go r.reconnect()
 		r.instantiated = true
-	}
-
-	if r.forcedToClose {
-		return &amqp.Channel{}
 	}
 
 	if r.localConnection == nil || r.localConnection.IsClosed() {
