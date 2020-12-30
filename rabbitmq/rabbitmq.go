@@ -81,7 +81,7 @@ func (r *Client) Connect() *amqp.Channel {
 			if r.reconnectAttemps <= r.Config.ReconnectAttemps {
 				r.reconnectAttemps += 1
 				r.localConnection = nil
-				fmt.Printf("broker: broker: connection attempt failed... retry %d/%d: %v", r.reconnectAttemps, r.Config.ReconnectAttemps, err)
+				fmt.Printf("broker: connection attempt failed... retry %d/%d: %v", r.reconnectAttemps, r.Config.ReconnectAttemps, err)
 				return r.Connect()
 			} else {
 				panic(err.Error())
