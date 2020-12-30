@@ -284,7 +284,9 @@ func (r *Client) DeleteRouter(routerName string) (bool, error) {
 
 //Close method closes connection and channel.
 func (r *Client) Close() {
-	_ = r.localConnection.Close()
+	if !r.localConnection.IsClosed() {
+		_ = r.localConnection.Close()
+	}
 }
 
 //HealthCheck method checks the current channel and connection status.
