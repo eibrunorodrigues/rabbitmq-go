@@ -60,7 +60,7 @@ func (r *Client) connect() (amqp.Connection, error) {
 	}
 
 	if r.Config.Host == "" {
-		log.Fatal("Please provide a truly valid BROKER_URI in your env")
+		log.Fatalf("broker: please provide a truly valid BROKER_URI in your env")
 	}
 
 	portString := strconv.Itoa(r.Config.Port)
@@ -81,6 +81,7 @@ func (r *Client) Connect() *amqp.Channel {
 			if r.reconnectAttemps <= r.Config.ReconnectAttemps {
 				r.reconnectAttemps += 1
 				r.localConnection = nil
+				fmt.Printf("broker: broker: connection attempt failed... retry %d/%d: %v", r.reconnectAttemps, r.Config.ReconnectAttemps, err)
 				return r.Connect()
 			} else {
 				panic(err.Error())
@@ -98,7 +99,7 @@ func (r *Client) Connect() *amqp.Channel {
 		r.channel.NotifyClose(errors)
 
 		go func(err chan *amqp.Error) {
-			fmt.Printf("Channel is Down... Reestablishing")
+			fmt.Printf("broker: channel is Down... Reestablishing")
 			r.channelIsOpen = false
 			r.Connect()
 		}(errors)
@@ -187,7 +188,7 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 		if _, err := r.Connect().QueueDeclare(queueName, false, false, exclusive, false, amqp.Table{}); err != nil {
 			return "", err
 		}
-		log.Println("Wrong durable... Creating Queue with flag durable: false")
+		fmt.Printf("broker: wrong durable... Creating Queue with flag durable: false")
 	}
 	if !exclusive {
 		if _, err := r.BindQueueToRouter(queueName, routerName, ""); err != nil {
@@ -208,7 +209,7 @@ func (r *Client) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, 
 
 	err = r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), true, false, false, false, amqp.Table{})
 	if err != nil {
-		log.Println("Exchange with wrong durable")
+		fmt.Printf("broker: exchange with wrong durable")
 		if err := r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), false, false, false, false, amqp.Table{}); err != nil {
 			return "", err
 		}
@@ -279,7 +280,7 @@ func (r *Client) BindQueueToRouter(queueName string, routerName string, filters 
 	case []types.Filters:
 		err = r.Connect().QueueBind(queueName, "#", routerName, false, filtersToTable(filters.([]types.Filters)))
 	default:
-		return false, errors.New("invalid filters type argument")
+		return false, errors.New("broker: invalid filters type argument")
 	}
 	return true, err
 }
@@ -293,7 +294,7 @@ func (r *Client) BindRouterToRouter(destination string, source string, filters i
 	case []types.Filters:
 		err = r.Connect().ExchangeBind(destination, "#", source, false, filtersToTable(filters.([]types.Filters)))
 	default:
-		return false, errors.New("invalid filters type argument")
+		return false, errors.New("broker: invalid filters type argument")
 	}
 	return true, err
 }
@@ -370,13 +371,13 @@ func validateQueueName(queueName string) {
 	_, err = utils.StrToInt(queueName)
 
 	if queueName == "" || !isMatch || err == nil {
-		panic("Invalid QueueName " + queueName)
+		panic("broker: invalid QueueName " + queueName)
 	}
 }
 
 func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) string {
 	if routerName == "" {
-		panic("Empty routerName found")
+		panic("broker: empty routerName found")
 	}
 
 	isAFullRouterName, err := regexp.MatchString("^[A-Z]+\\/[a-zA-Z_0-9]+\\.master$", routerName)
@@ -389,7 +390,7 @@ func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) string
 		if _, err = enums.ParseRouterPrefix(strings.ToUpper(strPrefix)); err == nil {
 			return routerName
 		}
-		panic("Default prefix is not allowed. " + strPrefix)
+		panic("broker: default prefix is not allowed. " + strPrefix)
 	}
 
 	if _, err = regexp.MatchString("^[a-zA-Z_0-9]+$\"", routerName); err == nil {
@@ -397,7 +398,7 @@ func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) string
 		return strings.ToUpper(prefixString) + "/" + routerName + ".master"
 	}
 
-	panic("Invalid routerName found")
+	panic("broker: invalid routerName found")
 }
 
 func validateFiltersArg(filters interface{}) (bool, error) {
@@ -407,7 +408,7 @@ func validateFiltersArg(filters interface{}) (bool, error) {
 	case []types.Filters:
 		return true, nil
 	default:
-		return false, errors.New("invalid filter passed")
+		return false, errors.New("broker: invalid filter passed")
 	}
 }
 
@@ -430,7 +431,7 @@ func (r *Client) publishMessage(message []byte, exchange string, routingKey stri
 		publishingMsg.Headers = filtersToTable(filters.([]types.Filters))
 		break
 	default:
-		return false, errors.New("invalid filters type")
+		return false, errors.New("broker: invalid filters type")
 	}
 
 	err := r.Connect().Publish(exchange, routingKey, false, false, publishingMsg)
