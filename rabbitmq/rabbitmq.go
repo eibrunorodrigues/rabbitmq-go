@@ -20,15 +20,15 @@ import (
 
 // Client layer following github.com/eibrunorodrigues/rabbitmq-go/interfaces/broker.go interface
 type Client struct {
-	localConnection  *amqp.Connection
-	channel          *amqp.Channel
-	forcedToClose    bool
-	instantiated     bool
-	reconnectAttemps int
-	channelIsOpen    bool
-	isListening      bool
-	consumerTag      string
-	Config           Configs
+	localConnection           *amqp.Connection
+	channel                   *amqp.Channel
+	forcedToClose             bool
+	reconnectRoutineIsRunning bool
+	reconnectAttemps          int
+	channelIsOpen             bool
+	isListening               bool
+	consumerTag               string
+	Config                    Configs
 }
 
 // Configs are the Connection parameters
@@ -81,12 +81,6 @@ func (r *Client) Connect() *amqp.Channel {
 		return &amqp.Channel{}
 	}
 
-	if r.instantiated {
-		go r.reconnect()
-	} else {
-		r.instantiated = true
-	}
-
 	if r.localConnection == nil || r.localConnection.IsClosed() {
 		conn, err := r.connect()
 		if err != nil {
@@ -107,6 +101,10 @@ func (r *Client) Connect() *amqp.Channel {
 		//https://github.com/streadway/amqp/pull/486
 		r.channel = r.makeChannel()
 		r.channelIsOpen = true
+
+		if !r.reconnectRoutineIsRunning {
+			go r.reconnect()
+		}
 	}
 
 	return r.channel
@@ -115,6 +113,7 @@ func (r *Client) Connect() *amqp.Channel {
 // reconnect waits to be notified about a connection
 // error, and then attempts to reconnect to Client.
 func (r *Client) reconnect() {
+	r.reconnectRoutineIsRunning = true
 	graceful := make(chan *amqp.Error)
 	errs := r.channel.NotifyClose(graceful)
 	for {
