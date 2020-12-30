@@ -24,7 +24,7 @@ type Client struct {
 	localConnection           *amqp.Connection
 	channel                   *amqp.Channel
 	reconnectRoutineIsRunning bool
-	reconnectAttemps          int
+	reconnectAttempts         int
 	channelIsOpen             bool
 	isListening               bool
 	consumerTag               string
@@ -80,10 +80,10 @@ func (r *Client) Connect() *amqp.Channel {
 	if r.localConnection == nil || r.localConnection.IsClosed() {
 		conn, err := r.connect()
 		if err != nil {
-			if r.reconnectAttemps < r.Config.ReconnectAttemps {
-				r.reconnectAttemps += 1
+			if r.reconnectAttempts < r.Config.ReconnectAttemps {
+				r.reconnectAttempts += 1
 				r.localConnection = nil
-				fmt.Printf("\nrabbitmq: connection attempt failed... retry %d/%d: %v", r.reconnectAttemps, r.Config.ReconnectAttemps, err)
+				fmt.Printf("\nrabbitmq: connection attempt failed... retry %d/%d: %v", r.reconnectAttempts, r.Config.ReconnectAttemps, err)
 				time.Sleep(2 * time.Second)
 				return r.Connect()
 			} else {
@@ -91,6 +91,7 @@ func (r *Client) Connect() *amqp.Channel {
 			}
 		}
 		r.localConnection = conn
+		r.reconnectAttempts = 0
 	}
 
 	if r.channel == nil || !r.channelIsOpen {
@@ -300,7 +301,6 @@ func (r *Client) Close() error {
 	return nil
 }
 
-
 //HealthCheck method checks the current channel and connection status.
 func (r *Client) HealthCheck() bool {
 	return !r.localConnection.IsClosed()
@@ -338,7 +338,7 @@ func (r *Client) BindRouterToRouter(destination string, source string, filters i
 //success on internal operation
 func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallback) error {
 	consumer := fmt.Sprintf("%s-%s", queueName, ksuid.New().String())
-	messages, err := r.Connect().Consume(queueName, consumer , false, false, false, false, nil)
+	messages, err := r.Connect().Consume(queueName, consumer, false, false, false, false, nil)
 	if err != nil {
 		return err
 	}
@@ -484,7 +484,13 @@ func (r *Client) makeChannel() *amqp.Channel {
 	ch, err := r.localConnection.Channel()
 
 	if err != nil {
-		panic(err)
+		if r.reconnectAttempts < r.Config.ReconnectAttemps {
+			fmt.Printf("\nbroker: couldn't create channel... Attempt %d/%d...", r.reconnectAttempts, r.Config.ReconnectAttemps)
+			r.reconnectAttempts += 1
+			return r.makeChannel()
+		} else {
+			panic(err)
+		}
 	}
 
 	return ch

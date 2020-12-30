@@ -6,3 +6,4 @@ require (
 	github.com/segmentio/ksuid v1.0.3 // indirect
 	github.com/streadway/amqp v1.0.0
 )
+
