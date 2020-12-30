@@ -80,18 +80,19 @@ func (r *Client) Connect() *amqp.Channel {
 		r.localConnection = &conn
 	}
 
-	if r.channel == nil {
+	if r.channel == nil || !r.channelIsOpen {
 		//better implementation for this depends on approval of pull request:
 		//https://github.com/streadway/amqp/pull/486
 		r.channel = r.makeChannel()
-
+		r.channelIsOpen = !r.channelIsOpen
 		errors := make(chan *amqp.Error)
 		r.channel.NotifyClose(errors)
 
-		go func(rr *Client, err chan *amqp.Error) {
+		go func(err chan *amqp.Error) {
 			fmt.Printf("Channel is Down... Reestablishing")
-			rr.channel = rr.makeChannel()
-		}(r, errors)
+			r.channelIsOpen = false
+			r.Connect()
+		}(errors)
 	}
 
 	return r.channel
