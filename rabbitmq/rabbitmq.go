@@ -20,39 +20,42 @@ import (
 
 // Client layer following github.com/eibrunorodrigues/rabbitmq-go/interfaces/broker.go interface
 type Client struct {
-	localConnection *amqp.Connection
-	channel         *amqp.Channel
-	channelIsOpen   bool
-	isListening     bool
-	consumerTag     string
-	Config          Configs
+	localConnection  *amqp.Connection
+	channel          *amqp.Channel
+	reconnectAttemps int
+	channelIsOpen    bool
+	isListening      bool
+	consumerTag      string
+	Config           Configs
 }
 
 // Configs are the Connection parameters
 type Configs struct {
-	Host          string
-	Port          int
-	Vhost         string
-	User          string
-	Pass          string
-	Heartbeat     int
-	SendRetryMax  int
-	ReplayDelayMs int
-	Prefetch      int
+	Host             string
+	Port             int
+	Vhost            string
+	User             string
+	Pass             string
+	Heartbeat        int
+	SendRetryMax     int
+	ReplayDelayMs    int
+	Prefetch         int
+	ReconnectAttemps int
 }
 
 func (r *Client) connect() (amqp.Connection, error) {
 	if r.Config.Host == "" {
 		r.Config = Configs{
-			Host:          utils.GetTypedEnvVariable("BROKER_HOST", "localhost", reflect.String).(string),
-			Port:          utils.GetTypedEnvVariable("BROKER_PORT", 5672, reflect.Int).(int),
-			Vhost:         utils.GetTypedEnvVariable("BROKER_VHOST", "/", reflect.String).(string),
-			User:          utils.GetTypedEnvVariable("BROKER_USER", "admin", reflect.String).(string),
-			Pass:          utils.GetTypedEnvVariable("BROKER_PASS", "admin", reflect.String).(string),
-			Heartbeat:     utils.GetTypedEnvVariable("BROKER_HEARTBEAT", 600, reflect.Int).(int),
-			SendRetryMax:  utils.GetTypedEnvVariable("BROKER_SEND_RETRY_MAX", 3, reflect.Int).(int),
-			ReplayDelayMs: utils.GetTypedEnvVariable("BROKER_REPLAY_DELAY_MS", 60000, reflect.Int).(int),
-			Prefetch:      utils.GetTypedEnvVariable("BROKER_PREFETCH", 100, reflect.Int).(int),
+			Host:             utils.GetTypedEnvVariable("BROKER_HOST", "localhost", reflect.String).(string),
+			Port:             utils.GetTypedEnvVariable("BROKER_PORT", 5672, reflect.Int).(int),
+			Vhost:            utils.GetTypedEnvVariable("BROKER_VHOST", "/", reflect.String).(string),
+			User:             utils.GetTypedEnvVariable("BROKER_USER", "admin", reflect.String).(string),
+			Pass:             utils.GetTypedEnvVariable("BROKER_PASS", "admin", reflect.String).(string),
+			Heartbeat:        utils.GetTypedEnvVariable("BROKER_HEARTBEAT", 600, reflect.Int).(int),
+			SendRetryMax:     utils.GetTypedEnvVariable("BROKER_SEND_RETRY_MAX", 3, reflect.Int).(int),
+			ReplayDelayMs:    utils.GetTypedEnvVariable("BROKER_REPLAY_DELAY_MS", 60000, reflect.Int).(int),
+			Prefetch:         utils.GetTypedEnvVariable("BROKER_PREFETCH", 100, reflect.Int).(int),
+			ReconnectAttemps: utils.GetTypedEnvVariable("BROKER_RECONNECT_ATTEMPS", 5, reflect.Int).(int),
 		}
 	}
 
@@ -75,7 +78,12 @@ func (r *Client) Connect() *amqp.Channel {
 	if r.localConnection == nil || r.localConnection.IsClosed() {
 		conn, err := r.connect()
 		if err != nil {
-			panic(err.Error())
+			if r.reconnectAttemps <= r.Config.ReconnectAttemps {
+				r.reconnectAttemps += 1
+				return r.Connect()
+			} else {
+				panic(err.Error())
+			}
 		}
 		r.localConnection = &conn
 	}
