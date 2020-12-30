@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"errors"
 	"fmt"
+	"github.com/segmentio/ksuid"
 	"log"
 	"reflect"
 	"regexp"
@@ -336,7 +337,8 @@ func (r *Client) BindRouterToRouter(destination string, source string, filters i
 //Listen starts consuming a queue and calls a callback function to wait for
 //success on internal operation
 func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallback) error {
-	messages, err := r.Connect().Consume(queueName, queueName, false, false, false, false, nil)
+	consumer := fmt.Sprintf("%s-%s", queueName, ksuid.New().String())
+	messages, err := r.Connect().Consume(queueName, consumer , false, false, false, false, nil)
 	if err != nil {
 		return err
 	}
