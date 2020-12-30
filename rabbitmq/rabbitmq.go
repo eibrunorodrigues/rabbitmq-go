@@ -81,7 +81,7 @@ func (r *Client) Connect() *amqp.Channel {
 			if r.reconnectAttemps <= r.Config.ReconnectAttemps {
 				r.reconnectAttemps += 1
 				r.localConnection = nil
-				fmt.Printf("broker: connection attempt failed... retry %d/%d: %v", r.reconnectAttemps, r.Config.ReconnectAttemps, err)
+				fmt.Printf("\nbroker: connection attempt failed... retry %d/%d: %v", r.reconnectAttemps, r.Config.ReconnectAttemps, err)
 				return r.Connect()
 			} else {
 				panic(err.Error())
@@ -99,7 +99,7 @@ func (r *Client) Connect() *amqp.Channel {
 		r.channel.NotifyClose(errors)
 
 		go func(err chan *amqp.Error) {
-			fmt.Printf("broker: channel is Down... Reestablishing")
+			fmt.Printf("\nbroker: channel is Down... Reestablishing")
 			r.channelIsOpen = false
 			r.Connect()
 		}(errors)
@@ -188,7 +188,7 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 		if _, err := r.Connect().QueueDeclare(queueName, false, false, exclusive, false, amqp.Table{}); err != nil {
 			return "", err
 		}
-		fmt.Printf("broker: wrong durable... Creating Queue with flag durable: false")
+		fmt.Printf("\nbroker: wrong durable... Creating Queue with flag durable: false")
 	}
 	if !exclusive {
 		if _, err := r.BindQueueToRouter(queueName, routerName, ""); err != nil {
@@ -209,7 +209,7 @@ func (r *Client) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, 
 
 	err = r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), true, false, false, false, amqp.Table{})
 	if err != nil {
-		fmt.Printf("broker: exchange with wrong durable")
+		fmt.Printf("\nbroker: exchange with wrong durable")
 		if err := r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), false, false, false, false, amqp.Table{}); err != nil {
 			return "", err
 		}
