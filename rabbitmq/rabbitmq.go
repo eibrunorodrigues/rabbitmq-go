@@ -23,7 +23,6 @@ import (
 type Client struct {
 	localConnection           *amqp.Connection
 	channel                   *amqp.Channel
-	forcedToClose             bool
 	reconnectRoutineIsRunning bool
 	reconnectAttemps          int
 	channelIsOpen             bool
@@ -78,10 +77,6 @@ func (r *Client) connect() (*amqp.Connection, error) {
 
 // Connect connects or reconnects to Client
 func (r *Client) Connect() *amqp.Channel {
-	if r.forcedToClose {
-		return &amqp.Channel{}
-	}
-
 	if r.localConnection == nil || r.localConnection.IsClosed() {
 		conn, err := r.connect()
 		if err != nil {
@@ -119,10 +114,6 @@ func (r *Client) reconnect() {
 	graceful := make(chan *amqp.Error)
 	errs := r.channel.NotifyClose(graceful)
 	for {
-		if r.forcedToClose {
-			break
-		}
-
 		select {
 		case <-graceful:
 			graceful = make(chan *amqp.Error)
@@ -293,13 +284,22 @@ func (r *Client) DeleteRouter(routerName string) (bool, error) {
 	return true, nil
 }
 
-//Close method closes connection and channel.
-func (r *Client) Close() {
+//ForceClose method closes connection.
+func (r *Client) ForceClose() {
 	if !r.localConnection.IsClosed() {
-		r.forcedToClose = true
 		_ = r.localConnection.Close()
 	}
 }
+
+//Close method closes the channel.
+func (r *Client) Close() error {
+	err := r.channel.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 
 //HealthCheck method checks the current channel and connection status.
 func (r *Client) HealthCheck() bool {

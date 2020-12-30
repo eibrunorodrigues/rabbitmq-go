@@ -18,7 +18,8 @@ type IBroker interface {
 	PublishToRouter(message []byte, routerName string, filters interface{}) (bool, error)
 	DeleteQueue(queueName string) (bool, error)
 	DeleteRouter(routerName string) (bool, error)
-	Close()
+	Close() error
+	ForceClose()
 	HealthCheck() bool
 	BindQueueToRouter(queueName string, routerName string, filters interface{}) (bool, error)
 	BindRouterToRouter(destination string, source string, filters interface{}) (bool, error)
