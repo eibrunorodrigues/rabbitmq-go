@@ -99,9 +99,7 @@ func (r *Client) Connect() *amqp.Channel {
 		r.channel.NotifyClose(errors)
 
 		go func(err chan *amqp.Error) {
-			fmt.Printf("\nbroker: channel is Down... Reestablishing")
 			r.channelIsOpen = false
-			r.Connect()
 		}(errors)
 	}
 
