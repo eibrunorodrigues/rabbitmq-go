@@ -119,14 +119,14 @@ func (r *Client) reconnect() {
 		case <-graceful:
 			graceful = make(chan *amqp.Error)
 			r.channelIsOpen = false
-			fmt.Printf("rabbitmq: graceful closed, reconnecting")
+			fmt.Printf("\nrabbitmq: graceful closed, reconnecting")
 			r.Connect()
 			errs = r.channel.NotifyClose(graceful)
 		case <-errs:
 			graceful = make(chan *amqp.Error)
 			r.channelIsOpen = false
 			r.Connect()
-			fmt.Printf("rabbitmq: broker is down... reconnecting")
+			fmt.Printf("\nrabbitmq: broker is down... reconnecting")
 			errs = r.channel.NotifyClose(graceful)
 		}
 	}
@@ -160,7 +160,7 @@ func (r *Client) CheckIfQueueExists(queueName string) bool {
 }
 
 //CheckIfRouterExists Passive Declares a Router. If an error with "not_found"
-//is thrown, then the router doesnt exist.
+//is returned, then the router doesnt exist.
 func (r *Client) CheckIfRouterExists(routerName string) bool {
 	exchangeType, _ := enums.RouterType.TOPIC.String()
 	err := r.Connect().ExchangeDeclarePassive(routerName, strings.ToLower(exchangeType), true, false, false, false, amqp.Table{})
@@ -496,3 +496,4 @@ func (r *Client) makeChannel() *amqp.Channel {
 	r.reconnectAttempts = 0
 	return ch
 }
+
