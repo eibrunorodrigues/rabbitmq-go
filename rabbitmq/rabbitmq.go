@@ -487,11 +487,12 @@ func (r *Client) makeChannel() *amqp.Channel {
 		if r.reconnectAttempts < r.Config.ReconnectAttemps {
 			fmt.Printf("\nbroker: couldn't create channel... Attempt %d/%d...", r.reconnectAttempts, r.Config.ReconnectAttemps)
 			r.reconnectAttempts += 1
+			time.Sleep(2 * time.Second)
 			return r.makeChannel()
 		} else {
 			panic(err)
 		}
 	}
-
+	r.reconnectAttempts = 0
 	return ch
 }
