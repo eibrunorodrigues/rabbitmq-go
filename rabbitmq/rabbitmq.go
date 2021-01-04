@@ -82,14 +82,13 @@ func (r *Client) Connect() *amqp.Channel {
 		conn, err := r.connect()
 		if err != nil {
 			if r.reconnectAttempts < r.Config.ReconnectAttemps {
-				r.reconnectAttempts += 1
+				r.reconnectAttempts++
 				r.localConnection = nil
 				fmt.Printf("\nrabbitmq: connection attempt failed... retry %d/%d: %v", r.reconnectAttempts, r.Config.ReconnectAttemps, err)
 				time.Sleep(2 * time.Second)
 				return r.Connect()
-			} else {
-				panic(err.Error())
 			}
+			panic(err.Error())
 		}
 		r.localConnection = conn
 		r.reconnectAttempts = 0
@@ -487,12 +486,11 @@ func (r *Client) makeChannel() *amqp.Channel {
 	if err != nil {
 		if r.reconnectAttempts < r.Config.ReconnectAttemps {
 			fmt.Printf("\nbroker: couldn't create channel... Attempt %d/%d...", r.reconnectAttempts, r.Config.ReconnectAttemps)
-			r.reconnectAttempts += 1
+			r.reconnectAttempts++
 			time.Sleep(2 * time.Second)
 			return r.makeChannel()
-		} else {
-			panic(err)
 		}
+		panic(err)
 	}
 	r.reconnectAttempts = 0
 	return ch
