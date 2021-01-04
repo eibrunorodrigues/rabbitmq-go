@@ -3,13 +3,14 @@ package rabbitmq
 import (
 	"errors"
 	"fmt"
-	"github.com/segmentio/ksuid"
 	"log"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/segmentio/ksuid"
 
 	"github.com/eibrunorodrigues/rabbitmq-go/enums"
 
@@ -139,14 +140,14 @@ func (r *Client) IsOpen() bool {
 
 //AcknowledgeMessage lets Rabbit knows that you received successfully a message
 //and removes it from a queue
-func (r *Client) AcknowledgeMessage(messageID int) {
-	_ = r.Connect().Ack(uint64(messageID), false)
+func (r *Client) AcknowledgeMessage(messageID int) error {
+	return r.Connect().Ack(uint64(messageID), false)
 }
 
 //RejectMessage lets Rabbit knows that you received successfully a message
 //and removes it from a queue
-func (r *Client) RejectMessage(messageID int, requeue bool) {
-	_ = r.Connect().Reject(uint64(messageID), requeue)
+func (r *Client) RejectMessage(messageID int, requeue bool) error {
+	return r.Connect().Reject(uint64(messageID), requeue)
 }
 
 //CheckIfQueueExists Passive Declares a Queue. If an error with "not_found"
@@ -351,16 +352,16 @@ func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallbac
 		receiverModel := GetReceiverModel(message)
 
 		if _, err := receiverCallback(receiverModel); err != nil {
-			r.RejectMessage(int(message.DeliveryTag), !receiverModel.IsARedelivery)
+			_ = r.RejectMessage(int(message.DeliveryTag), !receiverModel.IsARedelivery)
 		} else {
-			r.AcknowledgeMessage(int(message.DeliveryTag))
+			_ = r.AcknowledgeMessage(int(message.DeliveryTag))
 		}
 
 	}
 	return nil
 }
 
-//GetReceiverModel
+//GetReceiverModel receives an amqp.Delivery and returns a types.Receiver
 func GetReceiverModel(message amqp.Delivery) types.Receiver {
 	receiverModel := types.Receiver{}
 
@@ -496,4 +497,3 @@ func (r *Client) makeChannel() *amqp.Channel {
 	r.reconnectAttempts = 0
 	return ch
 }
-

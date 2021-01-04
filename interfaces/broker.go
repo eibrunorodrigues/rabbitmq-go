@@ -8,8 +8,8 @@ import (
 //IBroker is an interface for RabbitMQ.Client usage
 type IBroker interface {
 	IsOpen() bool
-	AcknowledgeMessage(messageID int)
-	RejectMessage(messageID int, requeue bool)
+	AcknowledgeMessage(messageID int) error
+	RejectMessage(messageID int, requeue bool) error
 	CheckIfQueueExists(queueName string) bool
 	CheckIfRouterExists(routerName string) bool
 	CreateQueue(queueName string, createDlq bool, exclusive bool) (string, error)
