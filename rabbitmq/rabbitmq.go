@@ -215,7 +215,7 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 		if _, err := r.Connect().QueueDeclare(queueName, false, false, exclusive, false, amqp.Table{}); err != nil {
 			return "", err
 		}
-		fmt.Printf("\nrabbitmq: wrong durable... Creating Queue with flag durable: false")
+		fmt.Printf("\nrabbitmq: wrong durable... creating queue with flag durable: false")
 	}
 	if !exclusive {
 		if _, err := r.BindQueueToRouter(queueName, routerName, ""); err != nil {
