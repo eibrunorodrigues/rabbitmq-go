@@ -319,7 +319,7 @@ func (r *Client) BindQueueToRouter(queueName string, routerName string, filters 
 	case string:
 		err = r.Connect().QueueBind(queueName, filters.(string), routerName, false, amqp.Table{})
 	case []types.Filters:
-		err = r.Connect().QueueBind(queueName, "#", routerName, false, filtersToTable(filters.([]types.Filters)))
+		err = r.Connect().QueueBind(queueName, "", routerName, false, filtersToTable(filters.([]types.Filters)))
 	default:
 		return false, errors.New("rabbitmq: invalid filters type argument")
 	}
@@ -333,7 +333,7 @@ func (r *Client) BindRouterToRouter(destination string, source string, filters i
 	case string:
 		err = r.Connect().ExchangeBind(destination, filters.(string), source, false, amqp.Table{})
 	case []types.Filters:
-		err = r.Connect().ExchangeBind(destination, "#", source, false, filtersToTable(filters.([]types.Filters)))
+		err = r.Connect().ExchangeBind(destination, "", source, false, filtersToTable(filters.([]types.Filters)))
 	default:
 		return false, errors.New("rabbitmq: invalid filters type argument")
 	}
