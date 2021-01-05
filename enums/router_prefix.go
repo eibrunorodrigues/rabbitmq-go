@@ -10,19 +10,18 @@ type RouterPrefixEnum int
 var (
 	prefixQueue   RouterPrefixEnum = 1
 	prefixTopic   RouterPrefixEnum = 2
-	prefixHeaders   RouterPrefixEnum = 3
+	prefixHeaders RouterPrefixEnum = 3
 )
 
 var RouterPrefix = struct {
-	QUEUE RouterPrefixEnum
-	TOPIC RouterPrefixEnum
+	QUEUE   RouterPrefixEnum
+	TOPIC   RouterPrefixEnum
 	HEADERS RouterPrefixEnum
 }{
-	QUEUE: prefixQueue,
-	TOPIC: prefixTopic,
+	QUEUE:   prefixQueue,
+	TOPIC:   prefixTopic,
 	HEADERS: prefixHeaders,
 }
-
 
 func (e RouterPrefixEnum) String() (string, error) {
 	switch e {

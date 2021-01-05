@@ -378,6 +378,7 @@ func GetReceiverModel(message amqp.Delivery) types.Receiver {
 		receiverModel.RouterOrigin = message.Exchange
 	}
 
+	receiverModel.MessageId = int(message.DeliveryTag)
 	receiverModel.IsARedelivery = checkIfIsARedelivery(message)
 	receiverModel.Body = message.Body
 

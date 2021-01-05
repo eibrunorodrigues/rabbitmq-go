@@ -8,24 +8,23 @@ import (
 type RouterTypeEnum int
 
 var (
-	typeDirect   RouterTypeEnum = 1
+	typeDirect  RouterTypeEnum = 1
 	typeTopic   RouterTypeEnum = 2
 	typeHeaders RouterTypeEnum = 3
 	typeFanout  RouterTypeEnum = 4
 )
 
 var RouterType = struct {
-	DIRECT RouterTypeEnum
-	TOPIC RouterTypeEnum
+	DIRECT  RouterTypeEnum
+	TOPIC   RouterTypeEnum
 	HEADERS RouterTypeEnum
-	FANOUT RouterTypeEnum
+	FANOUT  RouterTypeEnum
 }{
-	DIRECT: typeDirect,
-	TOPIC: typeTopic,
+	DIRECT:  typeDirect,
+	TOPIC:   typeTopic,
 	HEADERS: typeHeaders,
-	FANOUT: typeFanout,
+	FANOUT:  typeFanout,
 }
-
 
 func (e RouterTypeEnum) String() (string, error) {
 	switch e {
