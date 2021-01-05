@@ -3,6 +3,7 @@ package rabbitmq
 import (
 	"errors"
 	"fmt"
+	"github.com/eibrunorodrigues/rabbitmq-go/constants"
 	"log"
 	"reflect"
 	"regexp"
@@ -404,7 +405,7 @@ func checkIfIsARedelivery(message amqp.Delivery) bool {
 }
 
 func validateQueueName(queueName string) error {
-	isMatch, err := regexp.MatchString("^[a-zA-Z_0-9]+(?:\\.delay)?$", queueName)
+	isMatch, err := regexp.MatchString(constants.QueueNameRule, queueName)
 	if err != nil {
 		return err
 	}
@@ -412,7 +413,7 @@ func validateQueueName(queueName string) error {
 	_, err = utils.StrToInt(queueName)
 
 	if queueName == "" || !isMatch || err == nil {
-		return errors.New("rabbitmq: invalid QueueName " + queueName)
+		return errors.New("rabbitmq: invalid queueName " + queueName + "... rule: " + constants.QueueNameRule)
 	}
 
 	return nil
@@ -423,7 +424,7 @@ func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) (strin
 		return "", errors.New("rabbitmq: empty routerName found")
 	}
 
-	isAFullRouterName, err := regexp.MatchString("^[A-Z]+\\/[a-zA-Z_0-9]+\\.master$", routerName)
+	isAFullRouterName, err := regexp.MatchString(constants.FullRouterNameRule, routerName)
 	if err != nil {
 		return "", err
 	}
@@ -436,12 +437,12 @@ func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) (strin
 		return "", errors.New("rabbitmq: default prefix is not allowed. " + strPrefix)
 	}
 
-	if matched, err := regexp.MatchString("^[a-zA-Z_0-9]+$\"", routerName); err == nil && matched {
+	if matched, err := regexp.MatchString(constants.RouterNameRule, routerName); err == nil && matched {
 		prefixString, _ := prefix.String()
 		return strings.ToUpper(prefixString) + "/" + routerName + ".master", nil
 	}
 
-	return "", errors.New("rabbitmq: invalid routerName found")
+	return "", errors.New("rabbitmq: invalid routerName found... rule: " + constants.RouterNameRule)
 }
 
 func validateFiltersArg(filters interface{}) (bool, error) {
