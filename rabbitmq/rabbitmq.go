@@ -88,7 +88,7 @@ func (r *Client) Connect() *amqp.Channel {
 				time.Sleep(2 * time.Second)
 				return r.Connect()
 			}
-			panic(err.Error())
+			panic(err)
 		}
 		r.localConnection = conn
 		r.reconnectAttempts = 0
@@ -153,7 +153,7 @@ func (r *Client) RejectMessage(messageID int, requeue bool) error {
 //is thrown, then the queue doesnt exist.
 func (r *Client) CheckIfQueueExists(queueName string) bool {
 	_, err := r.Connect().QueueDeclarePassive(queueName, true, false, false, false, amqp.Table{})
-	if err != nil && strings.Contains(err.Error(), "not_found") {
+	if err != nil && strings.Contains(err.Error(), "404") {
 		return false
 	}
 	return true
@@ -164,7 +164,7 @@ func (r *Client) CheckIfQueueExists(queueName string) bool {
 func (r *Client) CheckIfRouterExists(routerName string) bool {
 	exchangeType, _ := enums.RouterType.TOPIC.String()
 	err := r.Connect().ExchangeDeclarePassive(routerName, strings.ToLower(exchangeType), true, false, false, false, amqp.Table{})
-	if err != nil && strings.Contains(err.Error(), "not_found") {
+	if err != nil && strings.Contains(err.Error(), "404") {
 		return false
 	}
 	return true
@@ -172,9 +172,11 @@ func (r *Client) CheckIfRouterExists(routerName string) bool {
 
 //CreateQueue creates a fancy queue (with dlq, exchanges and binds) and returns the name
 func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (string, error) {
-	validateQueueName(queueName)
-	queueName = strings.ToUpper(queueName)
+	if err := validateQueueName(queueName); err != nil {
+		return "", err
+	}
 
+	queueName = strings.ToUpper(queueName)
 	routerName, err := r.CreateRouter(queueName, enums.RouterPrefix.QUEUE, enums.RouterType.DIRECT)
 
 	if err != nil {
@@ -224,7 +226,10 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 
 //CreateRouter creates an Exchange and returns the formatted name
 func (r *Client) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, routerType enums.RouterTypeEnum) (string, error) {
-	routerName = validateRouterName(routerName, prefix)
+	routerName, err := validateRouterName(routerName, prefix)
+	if err != nil {
+		return "", err
+	}
 
 	routerTypeString, err := routerType.String()
 	if err != nil {
@@ -398,43 +403,45 @@ func checkIfIsARedelivery(message amqp.Delivery) bool {
 	return false
 }
 
-func validateQueueName(queueName string) {
+func validateQueueName(queueName string) error {
 	isMatch, err := regexp.MatchString("^[a-zA-Z_0-9]+(?:\\.delay)?$", queueName)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	_, err = utils.StrToInt(queueName)
 
 	if queueName == "" || !isMatch || err == nil {
-		panic("rabbitmq: invalid QueueName " + queueName)
+		return errors.New("rabbitmq: invalid QueueName " + queueName)
 	}
+
+	return nil
 }
 
-func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) string {
+func validateRouterName(routerName string, prefix enums.RouterPrefixEnum) (string, error) {
 	if routerName == "" {
-		panic("rabbitmq: empty routerName found")
+		return "", errors.New("rabbitmq: empty routerName found")
 	}
 
 	isAFullRouterName, err := regexp.MatchString("^[A-Z]+\\/[a-zA-Z_0-9]+\\.master$", routerName)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	if isAFullRouterName {
 		var strPrefix = strings.Split(routerName, "/")[0]
 		if _, err = enums.ParseRouterPrefix(strings.ToUpper(strPrefix)); err == nil {
-			return routerName
+			return routerName, nil
 		}
-		panic("rabbitmq: default prefix is not allowed. " + strPrefix)
+		return "", errors.New("rabbitmq: default prefix is not allowed. " + strPrefix)
 	}
 
-	if _, err = regexp.MatchString("^[a-zA-Z_0-9]+$\"", routerName); err == nil {
+	if matched, err := regexp.MatchString("^[a-zA-Z_0-9]+$\"", routerName); err == nil && matched {
 		prefixString, _ := prefix.String()
-		return strings.ToUpper(prefixString) + "/" + routerName + ".master"
+		return strings.ToUpper(prefixString) + "/" + routerName + ".master", nil
 	}
 
-	panic("rabbitmq: invalid routerName found")
+	return "", errors.New("rabbitmq: invalid routerName found")
 }
 
 func validateFiltersArg(filters interface{}) (bool, error) {
