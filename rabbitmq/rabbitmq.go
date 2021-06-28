@@ -18,13 +18,13 @@ import (
 	"github.com/eibrunorodrigues/rabbitmq-go/types"
 	"github.com/eibrunorodrigues/rabbitmq-go/utils"
 
-	"github.com/streadway/amqp"
+	"github.com/rabbitmq/amqp091-go"
 )
 
 // Client layer following github.com/eibrunorodrigues/rabbitmq-go/interfaces/broker.go interface
 type Client struct {
-	localConnection           *amqp.Connection
-	channel                   *amqp.Channel
+	localConnection           *amqp091.Connection
+	channel                   *amqp091.Channel
 	reconnectRoutineIsRunning bool
 	reconnectAttempts         int
 	channelIsOpen             bool
@@ -47,7 +47,7 @@ type Configs struct {
 	ReconnectAttemps int
 }
 
-func (r *Client) connect() (*amqp.Connection, error) {
+func (r *Client) connect() (*amqp091.Connection, error) {
 	if r.Config.Host == "" {
 		r.Config = Configs{
 			Host:             utils.GetTypedEnvVariable("BROKER_HOST", "localhost", reflect.String).(string),
@@ -69,16 +69,16 @@ func (r *Client) connect() (*amqp.Connection, error) {
 
 	portString := strconv.Itoa(r.Config.Port)
 
-	conn, err := amqp.Dial("amqp://" + r.Config.User + ":" + r.Config.Pass + "@" + r.Config.Host + ":" + portString + "/" + r.Config.Vhost)
+	conn, err := amqp091.Dial("amqp://" + r.Config.User + ":" + r.Config.Pass + "@" + r.Config.Host + ":" + portString + "/" + r.Config.Vhost)
 	if conn != nil {
 		return conn, err
 	}
 
-	return &amqp.Connection{}, err
+	return &amqp091.Connection{}, err
 }
 
 // Connect connects or reconnects to Client
-func (r *Client) Connect() *amqp.Channel {
+func (r *Client) Connect() *amqp091.Channel {
 	if r.localConnection == nil || r.localConnection.IsClosed() {
 		conn, err := r.connect()
 		if err != nil {
@@ -95,45 +95,14 @@ func (r *Client) Connect() *amqp.Channel {
 		r.reconnectAttempts = 0
 	}
 
-	if r.channel == nil || !r.channelIsOpen {
-		//better implementation for this depends on approval of pull request:
-		//https://github.com/streadway/amqp/pull/486
+	if r.channel == nil || r.channel.IsClosed() {
 		r.channel = r.makeChannel()
-		r.channelIsOpen = true
-
-		if !r.reconnectRoutineIsRunning {
-			go r.reconnect()
-		}
 	}
 
 	return r.channel
 }
 
-// reconnect waits to be notified about a connection
-// error, and then attempts to reconnect to Client.
-func (r *Client) reconnect() {
-	r.reconnectRoutineIsRunning = true
-	graceful := make(chan *amqp.Error)
-	errs := r.channel.NotifyClose(graceful)
-	for {
-		select {
-		case <-graceful:
-			graceful = make(chan *amqp.Error)
-			r.channelIsOpen = false
-			fmt.Printf("\nrabbitmq: graceful closed, reconnecting")
-			r.Connect()
-			errs = r.channel.NotifyClose(graceful)
-		case <-errs:
-			graceful = make(chan *amqp.Error)
-			r.channelIsOpen = false
-			r.Connect()
-			fmt.Printf("\nrabbitmq: broker is down... reconnecting")
-			errs = r.channel.NotifyClose(graceful)
-		}
-	}
-}
-
-// IsOpen verifys if the connection and channel are open
+// IsOpen verifies if the connection and channel are open
 func (r *Client) IsOpen() bool {
 	return !r.localConnection.IsClosed() && r.channelIsOpen
 }
@@ -153,7 +122,7 @@ func (r *Client) RejectMessage(messageID int, requeue bool) error {
 //CheckIfQueueExists Passive Declares a Queue. If an error with "not_found"
 //is thrown, then the queue doesnt exist.
 func (r *Client) CheckIfQueueExists(queueName string) bool {
-	_, err := r.Connect().QueueDeclarePassive(queueName, true, false, false, false, amqp.Table{})
+	_, err := r.Connect().QueueDeclarePassive(queueName, true, false, false, false, amqp091.Table{})
 	if err != nil && strings.Contains(err.Error(), "404") {
 		return false
 	}
@@ -164,7 +133,7 @@ func (r *Client) CheckIfQueueExists(queueName string) bool {
 //is returned, then the router doesnt exist.
 func (r *Client) CheckIfRouterExists(routerName string) bool {
 	exchangeType, _ := enums.RouterType.TOPIC.String()
-	err := r.Connect().ExchangeDeclarePassive(routerName, strings.ToLower(exchangeType), true, false, false, false, amqp.Table{})
+	err := r.Connect().ExchangeDeclarePassive(routerName, strings.ToLower(exchangeType), true, false, false, false, amqp091.Table{})
 	if err != nil && strings.Contains(err.Error(), "404") {
 		return false
 	}
@@ -209,10 +178,10 @@ func (r *Client) CreateQueue(queueName string, createDlq bool, exclusive bool) (
 		queueArgs = append(queueArgs, types.Filters{Key: "x-dead-letter-routing-key", Value: "delay"})
 	}
 
-	_, err = r.Connect().QueueDeclare(queueName, true, false, exclusive, false, amqp.Table{})
+	_, err = r.Connect().QueueDeclare(queueName, true, false, exclusive, false, amqp091.Table{})
 
 	if err != nil {
-		if _, err := r.Connect().QueueDeclare(queueName, false, false, exclusive, false, amqp.Table{}); err != nil {
+		if _, err := r.Connect().QueueDeclare(queueName, false, false, exclusive, false, amqp091.Table{}); err != nil {
 			return "", err
 		}
 		fmt.Printf("\nrabbitmq: wrong durable... creating queue with flag durable: false")
@@ -237,10 +206,10 @@ func (r *Client) CreateRouter(routerName string, prefix enums.RouterPrefixEnum, 
 		return "", err
 	}
 
-	err = r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), true, false, false, false, amqp.Table{})
+	err = r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), true, false, false, false, amqp091.Table{})
 	if err != nil {
 		fmt.Printf("\nrabbitmq: exchange with wrong durable")
-		if err := r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), false, false, false, false, amqp.Table{}); err != nil {
+		if err := r.Connect().ExchangeDeclare(routerName, strings.ToLower(routerTypeString), false, false, false, false, amqp091.Table{}); err != nil {
 			return "", err
 		}
 	}
@@ -317,7 +286,7 @@ func (r *Client) BindQueueToRouter(queueName string, routerName string, filters 
 	var err error = nil
 	switch filters.(type) {
 	case string:
-		err = r.Connect().QueueBind(queueName, filters.(string), routerName, false, amqp.Table{})
+		err = r.Connect().QueueBind(queueName, filters.(string), routerName, false, amqp091.Table{})
 	case []types.Filters:
 		err = r.Connect().QueueBind(queueName, "", routerName, false, filtersToTable(filters.([]types.Filters)))
 	default:
@@ -331,7 +300,7 @@ func (r *Client) BindRouterToRouter(destination string, source string, filters i
 	var err error = nil
 	switch filters.(type) {
 	case string:
-		err = r.Connect().ExchangeBind(destination, filters.(string), source, false, amqp.Table{})
+		err = r.Connect().ExchangeBind(destination, filters.(string), source, false, amqp091.Table{})
 	case []types.Filters:
 		err = r.Connect().ExchangeBind(destination, "", source, false, filtersToTable(filters.([]types.Filters)))
 	default:
@@ -366,8 +335,8 @@ func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallbac
 	return nil
 }
 
-//GetReceiverModel receives an amqp.Delivery and returns a types.Receiver
-func GetReceiverModel(message amqp.Delivery) types.Receiver {
+//GetReceiverModel receives an amqp091.Delivery and returns a types.Receiver
+func GetReceiverModel(message amqp091.Delivery) types.Receiver {
 	receiverModel := types.Receiver{}
 
 	receiverModel.Filters = append(receiverModel.Filters, types.Filters{Key: "routing-key", Value: message.RoutingKey})
@@ -393,7 +362,7 @@ func (r *Client) StopListening() (bool, error) {
 	return true, nil
 }
 
-func checkIfIsARedelivery(message amqp.Delivery) bool {
+func checkIfIsARedelivery(message amqp091.Delivery) bool {
 	if message.Headers["x-death"] != nil {
 		return true
 	}
@@ -457,8 +426,8 @@ func validateFiltersArg(filters interface{}) (bool, error) {
 	}
 }
 
-func filtersToTable(filters []types.Filters) amqp.Table {
-	var table = amqp.Table{}
+func filtersToTable(filters []types.Filters) amqp091.Table {
+	var table = amqp091.Table{}
 	for _, item := range filters {
 		table[item.Key] = item.Value
 	}
@@ -466,7 +435,7 @@ func filtersToTable(filters []types.Filters) amqp.Table {
 }
 
 func (r *Client) publishMessage(message []byte, exchange string, routingKey string, filters interface{}, retries int) (bool, error) {
-	publishingMsg := amqp.Publishing{Body: message, DeliveryMode: 2, Timestamp: time.Now()}
+	publishingMsg := amqp091.Publishing{Body: message, DeliveryMode: 2, Timestamp: time.Now()}
 
 	switch filters.(type) {
 	case string:
@@ -489,7 +458,7 @@ func (r *Client) publishMessage(message []byte, exchange string, routingKey stri
 	return true, nil
 }
 
-func (r *Client) makeChannel() *amqp.Channel {
+func (r *Client) makeChannel() *amqp091.Channel {
 	ch, err := r.localConnection.Channel()
 
 	if err != nil {
