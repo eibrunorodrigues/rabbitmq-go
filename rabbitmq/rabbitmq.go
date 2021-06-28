@@ -27,7 +27,6 @@ type Client struct {
 	channel                   *amqp091.Channel
 	reconnectRoutineIsRunning bool
 	reconnectAttempts         int
-	channelIsOpen             bool
 	isListening               bool
 	consumerTag               string
 	Config                    Configs
@@ -104,7 +103,7 @@ func (r *Client) Connect() *amqp091.Channel {
 
 // IsOpen verifies if the connection and channel are open
 func (r *Client) IsOpen() bool {
-	return !r.localConnection.IsClosed() && r.channelIsOpen
+	return !r.localConnection.IsClosed() && !r.channel.IsClosed()
 }
 
 //AcknowledgeMessage lets Rabbit knows that you received successfully a message
