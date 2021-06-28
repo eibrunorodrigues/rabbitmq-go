@@ -23,7 +23,8 @@ func publisher(br interfaces.IBroker, queue string) {
 	br.PublishToQueue([]byte(queue), queue, []types.Filters{types.Filters{Key: "key", Value: "#"}})
 }
 
-func receiveMessage(receiver types.Receiver) (bool, error) {
+func receiveMessage(receiver types.Receiver) error {
 	fmt.Println(receiver.Body)
-	return true, nil
+	_, _ = receiver.Act.Complete()
+	return nil
 }

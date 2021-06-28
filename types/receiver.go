@@ -6,6 +6,13 @@ type Receiver struct {
 	Filters       []Filters
 	IsARedelivery bool
 	MessageId     int
+	Act           Actions
 }
 
-type ReceiverCallback func(receiver Receiver) (bool, error)
+type Actions interface {
+	Complete() (bool, error)
+	Abandon() (bool, error)
+	Requeue() (bool, error)
+}
+
+type ReceiverCallback func(receiver Receiver) error

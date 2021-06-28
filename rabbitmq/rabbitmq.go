@@ -46,6 +46,13 @@ type Configs struct {
 	ReconnectAttemps int
 }
 
+type Actions struct {
+	message      *amqp091.Delivery
+	wasCompleted bool
+	wasAbandoned bool
+	wasRequeued  bool
+}
+
 func (r *Client) connect() (*amqp091.Connection, error) {
 	if r.Config.Host == "" {
 		r.Config = Configs{
@@ -324,10 +331,8 @@ func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallbac
 
 		receiverModel := GetReceiverModel(message)
 
-		if result, err := receiverCallback(receiverModel); err != nil || !result {
-			_ = r.RejectMessage(int(message.DeliveryTag), !receiverModel.IsARedelivery)
-		} else {
-			_ = r.AcknowledgeMessage(int(message.DeliveryTag))
+		if err := receiverCallback(receiverModel); err != nil {
+			return fmt.Errorf("rabbitmq: error receiving event. %v", err)
 		}
 
 	}
@@ -337,6 +342,7 @@ func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallbac
 //GetReceiverModel receives an amqp091.Delivery and returns a types.Receiver
 func GetReceiverModel(message amqp091.Delivery) types.Receiver {
 	receiverModel := types.Receiver{}
+	receiverModel.Act = &Actions{message: &message}
 
 	receiverModel.Filters = append(receiverModel.Filters, types.Filters{Key: "routing-key", Value: message.RoutingKey})
 
@@ -471,4 +477,31 @@ func (r *Client) makeChannel() *amqp091.Channel {
 	}
 	r.reconnectAttempts = 0
 	return ch
+}
+
+func (a *Actions) Complete() (bool, error) {
+	err := a.message.Ack(false)
+	if err != nil {
+		return false, fmt.Errorf("rabbitmq: error while acking event %v", err)
+	}
+	a.wasCompleted = true
+	return true, nil
+}
+
+func (a *Actions) Abandon() (bool, error) {
+	err := a.message.Reject(false)
+	if err != nil {
+		return false, fmt.Errorf("rabbitmq: error while abandoning event %v", err)
+	}
+	a.wasAbandoned = true
+	return true, nil
+}
+
+func (a *Actions) Requeue() (bool, error) {
+	err := a.message.Nack(false, true)
+	if err != nil {
+		return false, fmt.Errorf("rabbitmq: error while requeueing event %v", err)
+	}
+	a.wasRequeued = true
+	return true, nil
 }
