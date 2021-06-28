@@ -324,9 +324,9 @@ func (r *Client) Listen(queueName string, receiverCallback types.ReceiverCallbac
 
 		receiverModel := GetReceiverModel(message)
 
-		if _, err := receiverCallback(receiverModel); err != nil {
+		if result, err := receiverCallback(receiverModel); err != nil || !result {
 			_ = r.RejectMessage(int(message.DeliveryTag), !receiverModel.IsARedelivery)
-		} else {
+		} else if result {
 			_ = r.AcknowledgeMessage(int(message.DeliveryTag))
 		}
 
